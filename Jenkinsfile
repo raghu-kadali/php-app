@@ -14,16 +14,18 @@ pipeline {
         stage('Checkout PHP Code') {
             steps {
                 echo "Pulling code from GitHub..."
-                git 'git branch: 'main', url: 'https://github.com/raghu-kadali/php-app.git'
-'
+                git(
+                    url: 'https://github.com/raghu-kadali/php-app.git',
+                    branch: 'main'
+                )
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker image for PHP + Apache..."
+                echo "Building Docker image for PHP..."
                 sh """
-                cd application
+                cd project/application
                 docker build -t ${IMAGE_NAME}:${TAG} .
                 """
             }
@@ -57,7 +59,7 @@ pipeline {
             steps {
                 echo "Deploying MIG + ALB using Terraform..."
                 sh """
-                cd terraform
+                cd project/terraform
                 terraform init
                 terraform apply -auto-approve
                 """
