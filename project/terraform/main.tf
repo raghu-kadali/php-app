@@ -39,7 +39,7 @@ resource "google_compute_firewall" "allow_http" {
     protocol = "tcp"
     ports    = ["80"]
   }
-
+  source_ranges = ["0.0.0.0/0"]  # Allow all traffic (public)
   target_tags = ["php-server"]
 }
 
