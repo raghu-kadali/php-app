@@ -14,21 +14,23 @@ provider "google" {
   region  = var.region
 }
 
-# ------------------------------------------------------
-# Network (allow HTTP traffic)
-# ------------------------------------------------------
+# ---------------------------------------------------------
+# VPC + Subnet
+# ---------------------------------------------------------
 resource "google_compute_network" "vpc" {
   name = "php-vpc"
 }
 
 resource "google_compute_subnetwork" "subnet" {
   name          = "php-subnet"
-  ip_cidr_range = "10.0.0.0/24"
   region        = var.region
+  ip_cidr_range = "10.0.0.0/24"
   network       = google_compute_network.vpc.id
 }
 
-# Allow incoming HTTP for ALB health checks
+# ---------------------------------------------------------
+# Firewall for HTTP (port 80)
+# ---------------------------------------------------------
 resource "google_compute_firewall" "allow_http" {
   name    = "allow-http"
   network = google_compute_network.vpc.name
@@ -41,27 +43,19 @@ resource "google_compute_firewall" "allow_http" {
   target_tags = ["php-server"]
 }
 
-# ------------------------------------------------------
-# Instance Template with Docker Image
-# ------------------------------------------------------
+# ---------------------------------------------------------
+# Instance Template (COS + Docker image from GAR)
+# ---------------------------------------------------------
 resource "google_compute_instance_template" "php_template" {
-
-  name        = "php-instance-template"
+  name         = "php-instance-template"
   machine_type = "e2-medium"
-
-  tags = ["php-server"]
+  tags         = ["php-server"]
 
   disk {
     auto_delete = true
     boot        = true
-    type        = "PERSISTENT"
-    device_name = "boot"
-    mode        = "READ_WRITE"
-
-    initialize_params {
-      image = "projects/cos-cloud/global/images/family/cos-stable" # Container-Optimized OS
-    }
-  }
+    source_image = "projects/cos-cloud/global/images/family/cos-stable"
+  }   # <-- THIS WAS MISSING
 
   network_interface {
     subnetwork = google_compute_subnetwork.subnet.id
@@ -71,10 +65,10 @@ resource "google_compute_instance_template" "php_template" {
     "gce-container-declaration" = <<EOF
 spec:
   containers:
-    - name: php-app
-      image: "${var.docker_image}"
-      stdin: false
-      tty: false
+  - name: php-app
+    image: "${var.docker_image}"
+    stdin: false
+    tty: false
   restartPolicy: Always
 EOF
   }
@@ -85,9 +79,10 @@ EOF
   }
 }
 
-# ------------------------------------------------------
+
+# ---------------------------------------------------------
 # Managed Instance Group
-# ------------------------------------------------------
+# ---------------------------------------------------------
 resource "google_compute_region_instance_group_manager" "php_mig" {
   name               = "php-mig"
   region             = var.region
@@ -97,7 +92,7 @@ resource "google_compute_region_instance_group_manager" "php_mig" {
     instance_template = google_compute_instance_template.php_template.self_link
   }
 
-  target_size = 2   # initial VM count
+  target_size = 2
 
   auto_healing_policies {
     health_check      = google_compute_health_check.php_hc.id
@@ -105,9 +100,9 @@ resource "google_compute_region_instance_group_manager" "php_mig" {
   }
 }
 
-# ------------------------------------------------------
+# ---------------------------------------------------------
 # Health Check
-# ------------------------------------------------------
+# ---------------------------------------------------------
 resource "google_compute_health_check" "php_hc" {
   name = "php-health-check"
 
@@ -119,21 +114,19 @@ resource "google_compute_health_check" "php_hc" {
   check_interval_sec = 5
 }
 
-# ------------------------------------------------------
-# Load Balancer (External HTTP ALB)
-# ------------------------------------------------------
-
+# ---------------------------------------------------------
+# Load Balancer
+# ---------------------------------------------------------
 resource "google_compute_backend_service" "php_backend" {
   name        = "php-backend-service"
   protocol    = "HTTP"
   port_name   = "http"
   timeout_sec = 30
-  health_checks = [
-    google_compute_health_check.php_hc.id
-  ]
+
+  health_checks = [google_compute_health_check.php_hc.id]
 
   backend {
-    group = google_compute_region_instance_group_manager.php_mig.instance_group  
+    group = google_compute_region_instance_group_manager.php_mig.instance_group
   }
 }
 
@@ -148,8 +141,8 @@ resource "google_compute_target_http_proxy" "php_proxy" {
 }
 
 resource "google_compute_global_forwarding_rule" "php_forward_rule" {
-  name       = "php-forwarding-rule"
-  target     = google_compute_target_http_proxy.php_proxy.id
-  port_range = "80"
+  name        = "php-forwarding-rule"
+  target      = google_compute_target_http_proxy.php_proxy.id
+  port_range  = "80"
   ip_protocol = "TCP"
 }
