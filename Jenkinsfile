@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        PROJECT_ID = "raghu2pm"
+        PROJECT_ID = "kubernetes-477004"
         REGION     = "us-central1"
         REPO       = "php-app-repo"
         IMAGE_NAME = "php-app"
