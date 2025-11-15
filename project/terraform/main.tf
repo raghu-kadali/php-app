@@ -5,7 +5,6 @@ terraform {
       version = "~> 5.0"
     }
   }
-
   required_version = ">= 1.5.0"
 }
 
@@ -29,7 +28,7 @@ resource "google_compute_subnetwork" "subnet" {
 }
 
 # ---------------------------------------------------------
-# Firewall
+# Firewall Rules
 # ---------------------------------------------------------
 resource "google_compute_firewall" "allow_http" {
   name    = "allow-http"
@@ -118,13 +117,6 @@ resource "google_compute_region_instance_group_manager" "php_mig" {
   }
 }
 
-# Correct MIG group lookup
-data "google_compute_region_instance_group" "php_mig_group" {
-  name   = google_compute_region_instance_group_manager.php_mig.instance_group_name
-  region = var.region
-  depends_on = [google_compute_region_instance_group_manager.php_mig]
-}
-
 # ---------------------------------------------------------
 # Health Check
 # ---------------------------------------------------------
@@ -141,7 +133,7 @@ resource "google_compute_health_check" "php_hc" {
 }
 
 # ---------------------------------------------------------
-# Backend Service
+# Backend Service (Global)
 # ---------------------------------------------------------
 resource "google_compute_backend_service" "php_backend" {
   name        = "php-backend-service"
@@ -159,7 +151,7 @@ resource "google_compute_backend_service" "php_backend" {
 }
 
 # ---------------------------------------------------------
-# Load Balancer
+# URL Map, Proxy, Global IP, Forwarding Rule (HTTP LB)
 # ---------------------------------------------------------
 resource "google_compute_global_address" "php_lb_ip" {
   name = "php-lb-ip"
