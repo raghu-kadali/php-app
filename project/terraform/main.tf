@@ -133,7 +133,7 @@ resource "google_compute_health_check" "php_hc" {
 }
 
 # ---------------------------------------------------------
-# Backend Service (Global)
+# Backend Service
 # ---------------------------------------------------------
 resource "google_compute_backend_service" "php_backend" {
   name        = "php-backend-service"
@@ -151,7 +151,7 @@ resource "google_compute_backend_service" "php_backend" {
 }
 
 # ---------------------------------------------------------
-# URL Map, Proxy, Global IP, Forwarding Rule (HTTP LB)
+# URL Map, Proxy, Global IP, Forwarding Rule
 # ---------------------------------------------------------
 resource "google_compute_global_address" "php_lb_ip" {
   name = "php-lb-ip"
