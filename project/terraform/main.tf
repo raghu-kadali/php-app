@@ -25,6 +25,8 @@ resource "google_compute_subnetwork" "subnet" {
   region        = var.region
   ip_cidr_range = "10.0.0.0/24"
   network       = google_compute_network.vpc.id
+  # We're using external IP on VMs, so private Google access is not required.
+  # enable_private_google_access = true   # optional if you later switch to no external IP
 }
 
 # ---------------------------------------------------------
@@ -62,6 +64,8 @@ resource "google_compute_firewall" "allow_gcp_healthchecks" {
 
 # ---------------------------------------------------------
 # Instance Template (COS + Docker)
+# - Uses your GAR image: us-central1-docker.pkg.dev/<project>/php-app-repo/php-app:latest
+# - Exposes container hostPort: 80 so health checks reach the container
 # ---------------------------------------------------------
 resource "google_compute_instance_template" "php_template" {
   name         = "php-instance-template"
@@ -76,6 +80,8 @@ resource "google_compute_instance_template" "php_template" {
 
   network_interface {
     subnetwork = google_compute_subnetwork.subnet.id
+    # THIS GIVES EACH VM A PUBLIC EXTERNAL IP so docker can reach Artifact Registry
+    access_config {}
   }
 
   metadata = {
@@ -83,7 +89,8 @@ resource "google_compute_instance_template" "php_template" {
 spec:
   containers:
   - name: php-app
-    image: "${var.docker_image}"
+    # <- GAR image (uses your project id variable)
+    image: "us-central1-docker.pkg.dev/${var.project_id}/php-app-repo/php-app:latest"
     ports:
       - containerPort: 80
         hostPort: 80
@@ -98,7 +105,7 @@ EOF
 }
 
 # ---------------------------------------------------------
-# Managed Instance Group
+# Managed Instance Group (regional)
 # ---------------------------------------------------------
 resource "google_compute_region_instance_group_manager" "php_mig" {
   name               = "php-mig"
@@ -133,7 +140,7 @@ resource "google_compute_health_check" "php_hc" {
 }
 
 # ---------------------------------------------------------
-# Backend Service
+# Backend Service (Global)
 # ---------------------------------------------------------
 resource "google_compute_backend_service" "php_backend" {
   name        = "php-backend-service"
@@ -151,7 +158,7 @@ resource "google_compute_backend_service" "php_backend" {
 }
 
 # ---------------------------------------------------------
-# URL Map, Proxy, Global IP, Forwarding Rule
+# URL Map, Proxy, Global IP, Forwarding Rule (HTTP LB)
 # ---------------------------------------------------------
 resource "google_compute_global_address" "php_lb_ip" {
   name = "php-lb-ip"
