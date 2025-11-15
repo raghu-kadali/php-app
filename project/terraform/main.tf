@@ -29,7 +29,7 @@ resource "google_compute_subnetwork" "subnet" {
 }
 
 # ---------------------------------------------------------
-# Firewall for HTTP (port 80)
+# Firewall
 # ---------------------------------------------------------
 resource "google_compute_firewall" "allow_http" {
   name    = "allow-http"
@@ -99,7 +99,7 @@ EOF
 }
 
 # ---------------------------------------------------------
-# MIG
+# Managed Instance Group
 # ---------------------------------------------------------
 resource "google_compute_region_instance_group_manager" "php_mig" {
   name               = "php-mig"
@@ -107,4 +107,86 @@ resource "google_compute_region_instance_group_manager" "php_mig" {
   base_instance_name = "php-instance"
 
   version {
-    instance_template = google_compute_i_
+    instance_template = google_compute_instance_template.php_template.self_link
+  }
+
+  target_size = 2
+
+  auto_healing_policies {
+    health_check      = google_compute_health_check.php_hc.id
+    initial_delay_sec = 60
+  }
+}
+
+# Correct MIG group lookup
+data "google_compute_region_instance_group" "php_mig_group" {
+  name   = google_compute_region_instance_group_manager.php_mig.instance_group_name
+  region = var.region
+  depends_on = [google_compute_region_instance_group_manager.php_mig]
+}
+
+# ---------------------------------------------------------
+# Health Check
+# ---------------------------------------------------------
+resource "google_compute_health_check" "php_hc" {
+  name = "php-health-check"
+
+  http_health_check {
+    port         = 80
+    request_path = "/"
+  }
+
+  timeout_sec        = 5
+  check_interval_sec = 5
+}
+
+# ---------------------------------------------------------
+# Backend Service
+# ---------------------------------------------------------
+resource "google_compute_backend_service" "php_backend" {
+  name        = "php-backend-service"
+  protocol    = "HTTP"
+  port_name   = "http"
+  timeout_sec = 30
+
+  health_checks = [google_compute_health_check.php_hc.id]
+
+  backend {
+    group           = google_compute_region_instance_group_manager.php_mig.instance_group
+    balancing_mode  = "UTILIZATION"
+    max_utilization = 0.8
+  }
+}
+
+# ---------------------------------------------------------
+# Load Balancer
+# ---------------------------------------------------------
+resource "google_compute_global_address" "php_lb_ip" {
+  name = "php-lb-ip"
+}
+
+resource "google_compute_url_map" "php_urlmap" {
+  name            = "php-urlmap"
+  default_service = google_compute_backend_service.php_backend.id
+}
+
+resource "google_compute_target_http_proxy" "php_proxy" {
+  name    = "php-http-proxy"
+  url_map = google_compute_url_map.php_urlmap.id
+}
+
+resource "google_compute_global_forwarding_rule" "php_forward_rule" {
+  name       = "php-forwarding-rule"
+  target     = google_compute_target_http_proxy.php_proxy.id
+  port_range = "80"
+  ip_protocol = "TCP"
+  ip_address = google_compute_global_address.php_lb_ip.address
+}
+
+# ---------------------------------------------------------
+# Output
+# ---------------------------------------------------------
+output "load_balancer_ip" {
+  value       = google_compute_global_forwarding_rule.php_forward_rule.ip_address
+  description = "Access the PHP application using this IP"
+}
