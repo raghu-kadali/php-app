@@ -9,7 +9,7 @@ echo "<title>PHP Automated Deployment</title>";
 echo "</head>";
 echo "<body>";
 echo "<div class='container'>";
-echo "<h1>🚀 PHP Application Deployed Successfully In Prod!</h1>";
+echo "<h1>🚀 PHP Application Deployed Successfully In Prod in env!</h1>";
 echo "<p>This application is deployed through Jenkins → Artifact Registry → MIG → ALB.</p>";
 echo "<p>Everything is fully automated!</p>";
 echo "</div>";
