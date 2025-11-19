@@ -123,3 +123,4 @@ NKINS CI/CD DIAGRAM (ASCII)
  +---------------------------------------------+
  | Terraform Deploys MIG + ALB in GCP |
  +---------------------------------------------+
+terrfom file avaible here:/var/lib/jenkins/workspace/php-app/project/terraform#
